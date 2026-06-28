@@ -1,0 +1,344 @@
+1. Conceito central do sistema
+
+
+Mesa → Comandas → Pedidos → Itens do pedido
+
+Exemplo:
+
+Uma mesa 7 pode ter:
+
+Mesa 7
+ ├── Comanda 001 - João
+ │    ├── Pedido 1 - 12:30
+ │    └── Pedido 2 - 12:45
+ ├── Comanda 002 - Maria
+ └── Comanda 003 - Sem nome
+
+Ao fazer o primeiro pedido em uma mesa:
+
+Se a mesa não tiver comanda aberta:
+  cria comanda automaticamente
+  vincula comanda à mesa
+  cria pedido dentro da comanda
+
+Mas também deve existir:
+
+Abrir nova comanda
+Reservar comanda sem pedido
+Nomear comanda
+Transferir comanda
+Fechar comanda individual
+Fechar mesa inteira
+
+
+2. Banco PostgreSQL.
+
+MongoDB seria interessante para logs, mensagens de WhatsApp, histórico de IA, eventos e dados menos estruturados. Mas como banco principal do PDV, eu não escolheria.
+
+Banco principal: PostgreSQL
+ORM: Prisma
+Banco/cache opcional futuro: Redis
+Logs/IA/conversas futuras: MongoDB ou tabela JSONB no próprio PostgreSQL
+
+
+3. Módulos principais do sistema
+MVP inicial
+Mesas
+Comandas
+Pedidos
+Tela da cozinha
+Produtos/cardápio
+Caixa simples
+Pagamentos
+Estoque básico
+Usuários
+Evolução
+Delivery
+Clientes
+Endereços
+WhatsApp com IA
+Fiscal/NFC-e
+Relatórios
+Permissões avançadas
+Cupons/descontos
+Impressão térmica
+Comanda por QR Code
+Reservas
+Controle de motoboy
+Programa de fidelidade
+
+
+4. Entidades principais do banco
+
+users
+tables
+tabs/comandas
+orders
+order_items
+products
+categories
+stock_movements
+customers
+customer_addresses
+deliveries
+payments
+cash_registers
+cash_movements
+kitchen_tickets
+whatsapp_conversations
+settings
+
+Algumas relações importantes:
+
+tables 1:N comandas
+comandas 1:N orders
+orders 1:N order_items
+products 1:N order_items
+customers 1:N addresses
+orders 1:1 delivery opcional
+cash_registers 1:N payments
+products 1:N stock_movements
+5. Status importantes
+
+Você vai precisar de status bem definidos.
+
+Mesa
+AVAILABLE
+OCCUPIED
+RESERVED
+CLOSING
+Comanda
+OPEN
+CLOSED
+CANCELED
+TRANSFERRED
+Pedido
+PENDING
+SENT_TO_KITCHEN
+PREPARING
+READY
+DELIVERED
+CANCELED
+Pagamento
+PENDING
+PAID
+PARTIAL
+CANCELED
+ON_CREDIT
+Delivery
+WAITING
+PREPARING
+OUT_FOR_DELIVERY
+DELIVERED
+CANCELED
+6. Cozinha
+
+A cozinha deve receber tickets/pedidos com:
+
+pedido
+mesa
+comanda
+itens
+observações
+horário de envio
+tempo decorrido
+status
+prioridade
+
+A cor pode ser calculada no frontend:
+
+0 a 10 min: normal
+10 a 20 min: amarelo
+20 a 30 min: laranja
+30+ min: vermelho
+
+No banco você guarda o horário:
+
+sentToKitchenAt
+startedPreparingAt
+readyAt
+deliveredAt
+
+O tempo na tela é calculado em tempo real.
+
+7. Estoque
+
+O estoque não deve ser apenas um número no produto.
+
+Melhor estrutura:
+
+products
+stock_movements
+
+Exemplo de movimentação:
+
+ENTRADA
+SAIDA_VENDA
+AJUSTE_MANUAL
+CANCELAMENTO
+PERDA
+DEVOLUCAO
+
+Mesmo aceitando estoque negativo, o ideal é registrar tudo.
+
+Produto: Coca-Cola
+Estoque atual: -3
+Movimento: saída por venda
+
+Assim você não quebra o sistema e ainda consegue auditar depois.
+
+8. Caixa
+
+O caixa precisa ter abertura e fechamento.
+
+cash_registers
+cash_movements
+payments
+
+Campos importantes:
+
+openedAt
+closedAt
+openingAmount
+closingAmount
+expectedAmount
+differenceAmount
+openedById
+closedById
+status
+
+Formas de pagamento:
+
+MONEY
+PIX
+CREDIT_CARD
+DEBIT_CARD
+ON_CREDIT
+OTHER
+
+10% como configuração:
+
+serviceFeeEnabledByDefault = true
+serviceFeePercent = 10
+
+Mas por comanda o operador pode desmarcar.
+
+9. Delivery
+
+O delivery não deve ser “uma mesa falsa”. Eu faria como pedido normal com campo:
+
+isDelivery: true
+
+E uma tabela específica:
+
+deliveries
+
+Ligada ao pedido:
+
+delivery.orderId
+delivery.customerId
+delivery.addressId
+
+Assim o mesmo sistema de pedidos serve para salão e delivery.
+
+10. WhatsApp com IA
+
+Esse módulo deve ser separado.
+
+A IA pode consultar:
+
+cardápio
+preços
+horários
+formas de pagamento
+taxa de entrega
+endereços atendidos
+status do pedido
+
+Mas ela não deve finalizar ações sensíveis sem regras claras.
+
+Exemplo seguro:
+
+Cliente conversa no WhatsApp
+IA monta carrinho
+Sistema calcula total
+Cliente confirma
+Pedido entra como delivery
+Cozinha recebe
+Caixa acompanha
+11. O que está faltando pensar
+
+Pontos importantes que ainda não apareceram:
+
+cancelamento de item
+cancelamento de pedido
+motivo de cancelamento
+permissão por usuário
+transferir mesa
+juntar mesas
+dividir conta
+desconto por item
+desconto por comanda
+produto indisponível
+adicional/remover ingrediente
+observação por item
+impressão na cozinha
+impressão de fechamento
+histórico de alterações
+relatórios
+backup
+modo offline/local
+configurações da loja
+controle de turno
+sangria e suprimento de caixa
+
+12. MVP recomendado
+
+Eu começaria com este escopo:
+
+1. Cadastro de produtos e categorias
+2. Tela de mesas
+3. Abrir comanda automática no primeiro pedido
+4. Abrir comanda manual sem pedido
+5. Nomear comanda
+6. Lançar pedido
+7. Enviar para cozinha
+8. Tela da cozinha com tempo e status
+9. Fechar comanda
+10. Fechar mesa
+11. Pagamento por forma
+12. Baixa simples de estoque
+13. Abertura e fechamento de caixa
+
+Depois disso:
+
+14. Delivery
+15. Clientes e endereços
+16. WhatsApp/IA
+17. Relatórios
+18. Impressão térmica
+19. Fiscal
+13. Arquitetura ideal
+
+Eu dividiria o backend por módulos:
+
+src/modules/tables
+src/modules/tabs
+src/modules/orders
+src/modules/kitchen
+src/modules/products
+src/modules/stock
+src/modules/customers
+src/modules/delivery
+src/modules/payments
+src/modules/cash-register
+src/modules/users
+src/modules/settings
+src/modules/whatsapp
+
+Isso deixa o sistema pronto para crescer sem virar bagunça.
+
+A ideia principal é:
+
+pedido é o coração do sistema.
+Mesa, comanda, delivery, cozinha, estoque, caixa e WhatsApp giram ao redor dele.
