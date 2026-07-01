@@ -11,6 +11,14 @@ Base inicial do PDV seguindo o fluxo:
 - PostgreSQL
 - Prisma ORM
 
+## Arquitetura local-first
+
+O backend deve ser tratado como o servidor local do restaurante. Mesas, comandas, pedidos, cozinha, caixa, pagamentos internos e estoque basico devem funcionar pela rede local sem depender de internet.
+
+Integracoes como fiscal/NFC-e, recebimento de notas, WhatsApp, IA, backups externos e servicos de terceiros devem ser isoladas para nao bloquear a operacao local do PDV.
+
+Documento de referencia: `../docs/LOCAL_FIRST_ARCHITECTURE.md`.
+
 ## Como rodar
 
 1. Copie `.env.example` para `.env` e ajuste `DATABASE_URL`.
@@ -40,6 +48,8 @@ npm run dev
 ```
 
 API local: `http://localhost:3333`
+
+Em rede local, outros dispositivos devem acessar a API pelo IP da maquina servidora, por exemplo `http://IP-DO-SERVIDOR:3333`.
 
 ## Rotas iniciais
 

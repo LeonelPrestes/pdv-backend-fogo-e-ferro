@@ -14,6 +14,10 @@ type CreateOrderBody = {
   }>;
 };
 
+type CancelBody = {
+  reason: string;
+};
+
 function tabCode() {
   return `CMD-${Date.now()}`;
 }
@@ -24,6 +28,22 @@ export async function orderRoutes(app: FastifyInstance) {
     { preHandler: requireModule("ORDERS") },
     async (request, reply) => {
       const restaurantId = await getRestaurantId(request);
+      if (!Array.isArray(request.body.items) || request.body.items.length === 0) {
+        return reply.code(400).send({
+          error: "validation_error",
+          message: "Pedido precisa ter ao menos um item."
+        });
+      }
+
+      for (const item of request.body.items) {
+        if (!item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+          return reply.code(400).send({
+            error: "validation_error",
+            message: "Todos os itens precisam ter produto e quantidade maior que zero."
+          });
+        }
+      }
+
       const order = await prisma.$transaction(async (tx) => {
         const tableId = request.params.tableId;
         let tabId = request.body.tabId;
@@ -78,6 +98,31 @@ export async function orderRoutes(app: FastifyInstance) {
         });
 
         const productById = new Map(products.map((product) => [product.id, product]));
+
+        for (const item of request.body.items) {
+          const product = productById.get(item.productId);
+          if (!product) {
+            return reply.code(404).send({
+              error: "product_not_found",
+              message: `Produto nao encontrado: ${item.productId}`
+            });
+          }
+
+          const quantity = toDecimal(item.quantity);
+          if (!product.available) {
+            return reply.code(409).send({
+              error: "product_unavailable",
+              message: `Produto indisponivel: ${product.name}`
+            });
+          }
+
+          if (!product.allowNegativeStock && product.currentStock.lessThan(quantity)) {
+            return reply.code(409).send({
+              error: "insufficient_stock",
+              message: `Estoque insuficiente para ${product.name}.`
+            });
+          }
+        }
 
         const createdOrder = await tx.order.create({
           data: {
@@ -175,6 +220,150 @@ export async function orderRoutes(app: FastifyInstance) {
             kitchenTicket: true
           }
         });
+      });
+    }
+  );
+
+  app.post<{ Params: { orderId: string }; Body: CancelBody }>(
+    "/orders/:orderId/cancel",
+    { preHandler: requireModule("ORDERS") },
+    async (request, reply) => {
+      const restaurantId = await getRestaurantId(request);
+      const reason = request.body.reason?.trim();
+
+      if (!reason) {
+        return reply.code(400).send({
+          error: "validation_error",
+          message: "Motivo do cancelamento e obrigatorio."
+        });
+      }
+
+      return prisma.$transaction(async (tx) => {
+        const order = await tx.order.findFirstOrThrow({
+          where: { id: request.params.orderId, restaurantId },
+          include: { items: true, kitchenTicket: true }
+        });
+
+        if (order.status === "CANCELED") {
+          return reply.code(409).send({
+            error: "order_already_canceled",
+            message: "Pedido ja esta cancelado."
+          });
+        }
+
+        const now = new Date();
+        await tx.order.update({
+          where: { id: order.id },
+          data: { status: "CANCELED" }
+        });
+
+        if (order.kitchenTicket) {
+          await tx.kitchenTicket.update({
+            where: { id: order.kitchenTicket.id },
+            data: { status: "CANCELED" }
+          });
+        }
+
+        for (const item of order.items) {
+          if (item.canceledAt) continue;
+
+          await tx.orderItem.update({
+            where: { id: item.id },
+            data: { canceledAt: now, cancellationReason: reason }
+          });
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { currentStock: { increment: item.quantity } }
+          });
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+              restaurantId,
+              type: "CANCELAMENTO",
+              quantity: item.quantity,
+              reason,
+              orderItemId: item.id
+            }
+          });
+        }
+
+        await tx.auditLog.create({
+          data: {
+            restaurantId,
+            action: "ORDER_CANCELED",
+            entity: "Order",
+            entityId: order.id,
+            metadata: { reason }
+          }
+        });
+
+        return tx.order.findUnique({
+          where: { id: order.id },
+          include: { items: { include: { product: true } }, kitchenTicket: true }
+        });
+      });
+    }
+  );
+
+  app.post<{ Params: { itemId: string }; Body: CancelBody }>(
+    "/order-items/:itemId/cancel",
+    { preHandler: requireModule("ORDERS") },
+    async (request, reply) => {
+      const restaurantId = await getRestaurantId(request);
+      const reason = request.body.reason?.trim();
+
+      if (!reason) {
+        return reply.code(400).send({
+          error: "validation_error",
+          message: "Motivo do cancelamento e obrigatorio."
+        });
+      }
+
+      return prisma.$transaction(async (tx) => {
+        const item = await tx.orderItem.findFirstOrThrow({
+          where: {
+            id: request.params.itemId,
+            order: { restaurantId }
+          },
+          include: { order: true }
+        });
+
+        if (item.canceledAt) {
+          return reply.code(409).send({
+            error: "item_already_canceled",
+            message: "Item ja esta cancelado."
+          });
+        }
+
+        const updated = await tx.orderItem.update({
+          where: { id: item.id },
+          data: { canceledAt: new Date(), cancellationReason: reason }
+        });
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { currentStock: { increment: item.quantity } }
+        });
+        await tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            restaurantId,
+            type: "CANCELAMENTO",
+            quantity: item.quantity,
+            reason,
+            orderItemId: item.id
+          }
+        });
+        await tx.auditLog.create({
+          data: {
+            restaurantId,
+            action: "ORDER_ITEM_CANCELED",
+            entity: "OrderItem",
+            entityId: item.id,
+            metadata: { orderId: item.orderId, reason }
+          }
+        });
+
+        return updated;
       });
     }
   );

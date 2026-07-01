@@ -2,14 +2,7 @@ import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { cashRegisterRoutes } from "./modules/cash-register/cash-register.routes.js";
-import { kitchenRoutes } from "./modules/kitchen/kitchen.routes.js";
-import { moduleRoutes } from "./modules/modules/module.routes.js";
-import { orderRoutes } from "./modules/orders/order.routes.js";
-import { paymentRoutes } from "./modules/payments/payment.routes.js";
-import { productRoutes } from "./modules/products/product.routes.js";
-import { tableRoutes } from "./modules/tables/table.routes.js";
-import { tabRoutes } from "./modules/tabs/tab.routes.js";
+import { registerBusinessModules } from "./modules/index.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -40,14 +33,7 @@ export async function buildApp() {
     return reply.type("application/javascript; charset=utf-8").send(script);
   });
 
-  await app.register(tableRoutes);
-  await app.register(moduleRoutes);
-  await app.register(tabRoutes);
-  await app.register(orderRoutes);
-  await app.register(kitchenRoutes);
-  await app.register(productRoutes);
-  await app.register(paymentRoutes);
-  await app.register(cashRegisterRoutes);
+  await registerBusinessModules(app);
 
   return app;
 }
