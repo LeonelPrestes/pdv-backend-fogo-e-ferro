@@ -3,6 +3,10 @@ import type { ModuleKey } from "@prisma/client";
 import { prisma } from "./prisma.js";
 
 export const DEFAULT_RESTAURANT_SLUG = "default";
+const MODULE_ACCESS_CACHE_MS = 10_000;
+
+let defaultRestaurantIdPromise: Promise<string> | undefined;
+const moduleAccessCache = new Map<string, { allowed: boolean; expiresAt: number }>();
 
 export const moduleDefinitions: Array<{
   key: ModuleKey;
@@ -134,6 +138,17 @@ export async function ensureDefaultRestaurant() {
   return restaurant;
 }
 
+async function getDefaultRestaurantId() {
+  defaultRestaurantIdPromise ??= ensureDefaultRestaurant()
+    .then((restaurant) => restaurant.id)
+    .catch((error) => {
+      defaultRestaurantIdPromise = undefined;
+      throw error;
+    });
+
+  return defaultRestaurantIdPromise;
+}
+
 export async function getRestaurantId(request: FastifyRequest) {
   const headerValue = request.headers["x-restaurant-id"];
   const restaurantId = Array.isArray(headerValue) ? headerValue[0] : headerValue;
@@ -154,8 +169,7 @@ export async function getRestaurantId(request: FastifyRequest) {
     return restaurant.id;
   }
 
-  const restaurant = await ensureDefaultRestaurant();
-  return restaurant.id;
+  return getDefaultRestaurantId();
 }
 
 export function requireModule(moduleKey: ModuleKey): preHandlerHookHandler {
@@ -171,24 +185,43 @@ export function requireModule(moduleKey: ModuleKey): preHandlerHookHandler {
       });
     }
 
-    const restaurantModule = await prisma.restaurantModule.findUnique({
-      where: {
-        restaurantId_moduleKey: {
-          restaurantId,
-          moduleKey
-        }
-      },
-      include: {
-        module: true
-      }
-    });
+    const cacheKey = `${restaurantId}:${moduleKey}`;
+    const cachedAccess = moduleAccessCache.get(cacheKey);
+    const now = Date.now();
+    let allowed = cachedAccess && cachedAccess.expiresAt > now ? cachedAccess.allowed : undefined;
 
-    if (
-      !restaurantModule ||
-      !restaurantModule.enabled ||
-      restaurantModule.module.status !== "ACTIVE" ||
-      (restaurantModule.expiresAt && restaurantModule.expiresAt < new Date())
-    ) {
+    if (allowed === undefined) {
+      const restaurantModule = await prisma.restaurantModule.findUnique({
+        where: {
+          restaurantId_moduleKey: {
+            restaurantId,
+            moduleKey
+          }
+        },
+        select: {
+          enabled: true,
+          expiresAt: true,
+          module: {
+            select: {
+              status: true
+            }
+          }
+        }
+      });
+
+      allowed = Boolean(
+        restaurantModule &&
+        restaurantModule.enabled &&
+        restaurantModule.module.status === "ACTIVE" &&
+        (!restaurantModule.expiresAt || restaurantModule.expiresAt >= new Date())
+      );
+      moduleAccessCache.set(cacheKey, {
+        allowed,
+        expiresAt: now + MODULE_ACCESS_CACHE_MS
+      });
+    }
+
+    if (!allowed) {
       return reply.code(403).send({
         error: "module_disabled",
         module: moduleKey,

@@ -1,12 +1,40 @@
 import type { FastifyInstance } from "fastify";
 import { getRestaurantId, requireModule } from "../../lib/modules.js";
 import { prisma } from "../../lib/prisma.js";
+import { printKitchenTicket } from "../../lib/printer.js";
 
 type UpdateTicketBody = {
   status: "PREPARING" | "READY" | "DELIVERED" | "CANCELED";
 };
 
 export async function kitchenRoutes(app: FastifyInstance) {
+  app.post("/kitchen/printer/test", { preHandler: requireModule("KITCHEN") }, async () => {
+    const now = new Date();
+
+    return printKitchenTicket({
+      sequentialNumber: 1,
+      createdAt: now,
+      sentToKitchenAt: now,
+      notes: "Teste de impressao Bematech MP-4200 TH",
+      tab: {
+        code: "TESTE",
+        customerName: "Teste",
+        table: {
+          number: 0
+        }
+      },
+      items: [
+        {
+          quantity: 1,
+          notes: "Se este texto saiu, a cozinha esta configurada.",
+          product: {
+            name: "Pedido de teste"
+          }
+        }
+      ]
+    });
+  });
+
   app.get("/kitchen/tickets", { preHandler: requireModule("KITCHEN") }, async (request) => {
     const restaurantId = await getRestaurantId(request);
 
