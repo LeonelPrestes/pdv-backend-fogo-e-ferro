@@ -15,7 +15,7 @@ const moduleKeys = new Set(moduleDefinitions.map((moduleDefinition) => moduleDef
 
 function parseModuleKey(value: string): ModuleKey {
   if (!moduleKeys.has(value as ModuleKey)) {
-    throw new Error(`Modulo invalido: ${value}`);
+    throw new Error(`Módulo inválido: ${value}`);
   }
 
   return value as ModuleKey;

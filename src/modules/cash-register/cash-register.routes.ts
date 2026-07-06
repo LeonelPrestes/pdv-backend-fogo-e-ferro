@@ -101,7 +101,7 @@ export async function cashRegisterRoutes(app: FastifyInstance) {
     if (openCashRegister) {
       return reply.code(409).send({
         error: "cash_register_already_open",
-        message: "Ja existe um caixa aberto."
+        message: "Já existe um caixa aberto."
       });
     }
 

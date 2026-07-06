@@ -10,6 +10,7 @@ type CreateCategoryBody = {
 type CreateProductBody = {
   name: string;
   description?: string;
+  imageUrl?: string;
   price: number;
   currentStock?: number;
   allowNegativeStock?: boolean;
@@ -20,6 +21,18 @@ type CreateProductBody = {
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeOptionalUrl(value: unknown) {
+  const url = normalizeText(value);
+  if (!url) return null;
+
+  try {
+    const parsedUrl = new URL(url);
+    return ["http:", "https:"].includes(parsedUrl.protocol) ? parsedUrl.toString() : "";
+  } catch {
+    return "";
+  }
 }
 
 export async function productRoutes(app: FastifyInstance) {
@@ -37,7 +50,7 @@ export async function productRoutes(app: FastifyInstance) {
     const restaurantId = await getRestaurantId(request);
 
     return prisma.category.findMany({
-      where: { restaurantId },
+      where: { restaurantId, active: true },
       orderBy: { name: "asc" }
     });
   });
@@ -61,7 +74,7 @@ export async function productRoutes(app: FastifyInstance) {
     if (!name) {
       return reply.code(400).send({
         error: "validation_error",
-        message: "Nome da categoria e obrigatorio."
+        message: "Nome da categoria é obrigatório."
       });
     }
 
@@ -82,18 +95,26 @@ export async function productRoutes(app: FastifyInstance) {
     async (request, reply) => {
     const restaurantId = await getRestaurantId(request);
     const name = normalizeText(request.body.name);
+    const imageUrl = normalizeOptionalUrl(request.body.imageUrl);
 
     if (!name) {
       return reply.code(400).send({
         error: "validation_error",
-        message: "Nome do produto e obrigatorio."
+        message: "Nome do produto é obrigatório."
+      });
+    }
+
+    if (imageUrl === "") {
+      return reply.code(400).send({
+        error: "validation_error",
+        message: "URL da imagem deve ser um link http ou https válido."
       });
     }
 
     if (!Number.isFinite(request.body.price) || request.body.price <= 0) {
       return reply.code(400).send({
         error: "validation_error",
-        message: "Preco do produto deve ser maior que zero."
+        message: "Preço do produto deve ser maior que zero."
       });
     }
 
@@ -129,7 +150,8 @@ export async function productRoutes(app: FastifyInstance) {
       data: {
         restaurantId,
         name,
-        description: request.body.description,
+        description: normalizeText(request.body.description) || null,
+        imageUrl,
         price: toDecimal(request.body.price),
         currentStock: toDecimal(request.body.currentStock ?? 0),
         allowNegativeStock: request.body.allowNegativeStock ?? true,

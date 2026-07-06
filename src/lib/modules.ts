@@ -19,7 +19,7 @@ export const moduleDefinitions: Array<{
   {
     key: "TABS",
     name: "Comandas",
-    description: "Abertura, edicao e fechamento de comandas.",
+    description: "Abertura, edição e fechamento de comandas.",
     enabledByDefault: true
   },
   {
@@ -31,7 +31,7 @@ export const moduleDefinitions: Array<{
   {
     key: "KITCHEN",
     name: "Cozinha",
-    description: "Tickets e status de producao.",
+    description: "Tickets e status de produção.",
     enabledByDefault: true
   },
   {
@@ -78,14 +78,14 @@ export const moduleDefinitions: Array<{
   },
   {
     key: "REPORTS",
-    name: "Relatorios",
-    description: "Relatorios gerenciais.",
+    name: "Relatórios",
+    description: "Relatórios gerenciais.",
     enabledByDefault: false
   },
   {
     key: "SETTINGS",
-    name: "Configuracoes",
-    description: "Configuracoes da loja.",
+    name: "Configurações",
+    description: "Configurações da loja.",
     enabledByDefault: true
   }
 ];
@@ -95,7 +95,7 @@ export async function ensureDefaultRestaurant() {
     where: { slug: DEFAULT_RESTAURANT_SLUG },
     update: {},
     create: {
-      name: "Restaurante Padrao",
+      name: "Restaurante Padrão",
       slug: DEFAULT_RESTAURANT_SLUG
     }
   });
@@ -148,7 +148,7 @@ export async function getRestaurantId(request: FastifyRequest) {
     });
 
     if (!restaurant) {
-      throw new Error("Restaurante nao encontrado ou inativo.");
+      throw new Error("Restaurante não encontrado ou inativo.");
     }
 
     return restaurant.id;
@@ -167,7 +167,7 @@ export function requireModule(moduleKey: ModuleKey): preHandlerHookHandler {
     } catch {
       return reply.code(404).send({
         error: "restaurant_not_found",
-        message: "Restaurante nao encontrado ou inativo."
+        message: "Restaurante não encontrado ou inativo."
       });
     }
 
@@ -192,7 +192,7 @@ export function requireModule(moduleKey: ModuleKey): preHandlerHookHandler {
       return reply.code(403).send({
         error: "module_disabled",
         module: moduleKey,
-        message: `Modulo ${moduleKey} nao esta habilitado para este restaurante.`
+        message: `Módulo ${moduleKey} não está habilitado para este restaurante.`
       });
     }
   };

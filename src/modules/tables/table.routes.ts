@@ -58,7 +58,7 @@ export async function tableRoutes(app: FastifyInstance) {
     if (!Number.isInteger(number) || number <= 0) {
       return reply.code(400).send({
         error: "validation_error",
-        message: "Numero da mesa deve ser um inteiro maior que zero."
+        message: "Número da mesa deve ser um inteiro maior que zero."
       });
     }
 
@@ -87,7 +87,7 @@ export async function tableRoutes(app: FastifyInstance) {
             tabs: {
               where: { status: "OPEN" },
               include: {
-                orders: { include: { items: true } },
+                orders: { include: { items: true, kitchenTicket: true } },
                 payments: true
               }
             }
@@ -107,6 +107,34 @@ export async function tableRoutes(app: FastifyInstance) {
               code: tab.code,
               customerName: tab.customerName,
               balance: totals.balance
+            }))
+          });
+        }
+
+        const activeKitchenTabs = table.tabs
+          .map((tab) => ({
+            tab,
+            orders: tab.orders.filter((order) =>
+              order.kitchenTicket &&
+              ["SENT_TO_KITCHEN", "PREPARING", "READY"].includes(order.kitchenTicket.status)
+            )
+          }))
+          .filter((entry) => entry.orders.length > 0);
+
+        if (activeKitchenTabs.length > 0) {
+          return reply.code(409).send({
+            error: "table_has_active_kitchen_orders",
+            message: "Mesa possui pedidos ativos na cozinha.",
+            pendingTabs: activeKitchenTabs.map(({ tab, orders }) => ({
+              id: tab.id,
+              code: tab.code,
+              customerName: tab.customerName,
+              orders: orders.map((order) => ({
+                id: order.id,
+                sequentialNumber: order.sequentialNumber,
+                status: order.status,
+                kitchenStatus: order.kitchenTicket?.status
+              }))
             }))
           });
         }

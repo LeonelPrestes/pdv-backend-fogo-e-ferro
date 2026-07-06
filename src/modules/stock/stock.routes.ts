@@ -37,7 +37,7 @@ export async function stockRoutes(app: FastifyInstance) {
       if (!request.body.productId) {
         return reply.code(400).send({
           error: "validation_error",
-          message: "Produto e obrigatorio."
+          message: "Produto é obrigatório."
         });
       }
 
@@ -52,7 +52,7 @@ export async function stockRoutes(app: FastifyInstance) {
       if (!allowedTypes.includes(request.body.type)) {
         return reply.code(400).send({
           error: "validation_error",
-          message: "Tipo de movimentacao invalido."
+          message: "Tipo de movimentação inválido."
         });
       }
 

@@ -104,7 +104,7 @@ export async function orderRoutes(app: FastifyInstance) {
           if (!product) {
             return reply.code(404).send({
               error: "product_not_found",
-              message: `Produto nao encontrado: ${item.productId}`
+              message: `Produto não encontrado: ${item.productId}`
             });
           }
 
@@ -112,7 +112,7 @@ export async function orderRoutes(app: FastifyInstance) {
           if (!product.available) {
             return reply.code(409).send({
               error: "product_unavailable",
-              message: `Produto indisponivel: ${product.name}`
+              message: `Produto indisponível: ${product.name}`
             });
           }
 
@@ -133,7 +133,7 @@ export async function orderRoutes(app: FastifyInstance) {
             items: {
               create: request.body.items.map((item) => {
                 const product = productById.get(item.productId);
-                if (!product) throw new Error(`Produto nao encontrado: ${item.productId}`);
+                if (!product) throw new Error(`Produto não encontrado: ${item.productId}`);
 
                 return {
                   productId: item.productId,
@@ -234,7 +234,7 @@ export async function orderRoutes(app: FastifyInstance) {
       if (!reason) {
         return reply.code(400).send({
           error: "validation_error",
-          message: "Motivo do cancelamento e obrigatorio."
+          message: "Motivo do cancelamento é obrigatório."
         });
       }
 
@@ -247,7 +247,7 @@ export async function orderRoutes(app: FastifyInstance) {
         if (order.status === "CANCELED") {
           return reply.code(409).send({
             error: "order_already_canceled",
-            message: "Pedido ja esta cancelado."
+            message: "Pedido já está cancelado."
           });
         }
 
@@ -315,7 +315,7 @@ export async function orderRoutes(app: FastifyInstance) {
       if (!reason) {
         return reply.code(400).send({
           error: "validation_error",
-          message: "Motivo do cancelamento e obrigatorio."
+          message: "Motivo do cancelamento é obrigatório."
         });
       }
 
@@ -331,7 +331,7 @@ export async function orderRoutes(app: FastifyInstance) {
         if (item.canceledAt) {
           return reply.code(409).send({
             error: "item_already_canceled",
-            message: "Item ja esta cancelado."
+            message: "Item já está cancelado."
           });
         }
 

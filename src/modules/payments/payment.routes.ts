@@ -8,8 +8,14 @@ type CreatePaymentBody = {
   tabId: string;
   cashRegisterId?: string;
   method: "MONEY" | "PIX" | "CREDIT_CARD" | "DEBIT_CARD" | "ON_CREDIT" | "OTHER";
-  amount: number;
+  amount?: number | string;
 };
+
+function parseAmount(value: number | string | undefined) {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string") return Number.NaN;
+  return Number(value.trim().replace(/\./g, "").replace(",", "."));
+}
 
 export async function paymentRoutes(app: FastifyInstance) {
   app.post<{ Body: CreatePaymentBody }>(
@@ -18,7 +24,9 @@ export async function paymentRoutes(app: FastifyInstance) {
     async (request, reply) => {
     const restaurantId = await getRestaurantId(request);
 
-    if (!Number.isFinite(request.body.amount) || request.body.amount <= 0) {
+    const amount = parseAmount(request.body.amount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
       return reply.code(400).send({
         error: "validation_error",
         message: "Valor do pagamento deve ser maior que zero."
@@ -37,7 +45,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     });
     const totals = calculateTabTotals(tab);
 
-    if (request.body.amount > totals.balance + 0.009) {
+    if (amount > totals.balance + 0.009) {
       return reply.code(409).send({
         error: "payment_above_balance",
         message: "Pagamento maior que o saldo pendente.",
@@ -63,7 +71,7 @@ export async function paymentRoutes(app: FastifyInstance) {
           cashRegisterId: request.body.cashRegisterId,
           method: request.body.method,
           status: request.body.method === "ON_CREDIT" ? "ON_CREDIT" : "PAID",
-          amount: toDecimal(request.body.amount),
+          amount: toDecimal(amount),
           paidAt: new Date()
         }
       });
@@ -73,7 +81,7 @@ export async function paymentRoutes(app: FastifyInstance) {
           data: {
             cashRegisterId: request.body.cashRegisterId,
             type: "SALE",
-            amount: toDecimal(request.body.amount),
+            amount: toDecimal(amount),
             reason: `Pagamento ${created.method}`
           }
         });

@@ -278,6 +278,7 @@ model Product {
   restaurant     Restaurant      @relation(fields: [restaurantId], references: [id])
   name           String
   description    String?
+  imageUrl       String?
   price          Decimal         @db.Decimal(10, 2)
   currentStock   Decimal         @default(0) @db.Decimal(10, 3)
   allowNegativeStock Boolean      @default(true)

@@ -147,9 +147,9 @@ export async function tabRoutes(app: FastifyInstance) {
 
     return prisma.$transaction(async (tx) => {
       const currentTab = await tx.tab.findFirstOrThrow({
-        where: { id: request.params.tabId, restaurantId },
+        where: { id: request.params.tabId, restaurantId, status: "OPEN" },
         include: {
-          orders: { include: { items: true } },
+          orders: { include: { items: true, kitchenTicket: true } },
           payments: true
         }
       });
@@ -160,6 +160,24 @@ export async function tabRoutes(app: FastifyInstance) {
           error: "tab_has_pending_balance",
           message: "Comanda possui saldo pendente.",
           totals
+        });
+      }
+
+      const activeKitchenOrders = currentTab.orders.filter((order) =>
+        order.kitchenTicket &&
+        ["SENT_TO_KITCHEN", "PREPARING", "READY"].includes(order.kitchenTicket.status)
+      );
+
+      if (activeKitchenOrders.length > 0) {
+        return reply.code(409).send({
+          error: "tab_has_active_kitchen_orders",
+          message: "Comanda possui pedidos ativos na cozinha.",
+          orders: activeKitchenOrders.map((order) => ({
+            id: order.id,
+            sequentialNumber: order.sequentialNumber,
+            status: order.status,
+            kitchenStatus: order.kitchenTicket?.status
+          }))
         });
       }
 
@@ -202,7 +220,7 @@ export async function tabRoutes(app: FastifyInstance) {
       if (!request.body.targetTableId) {
         return reply.code(400).send({
           error: "validation_error",
-          message: "Mesa destino e obrigatoria."
+          message: "Mesa destino é obrigatória."
         });
       }
 
@@ -218,7 +236,7 @@ export async function tabRoutes(app: FastifyInstance) {
         if (tab.tableId === targetTable.id) {
           return reply.code(400).send({
             error: "same_table_transfer",
-            message: "Comanda ja esta na mesa destino."
+            message: "Comanda já está na mesa destino."
           });
         }
 
